@@ -1,0 +1,774 @@
+<html>
+    <head>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"/>
+        <style>
+            html,
+            body,
+            #viewDiv {
+                padding: 25px 15px 50px;
+                margin: 0;
+                height: 97vh;
+            }
+            #coordinates {
+                position: absolute;
+                left: -9999px;
+            }
+            
+            #cellSideForm {
+                position: absolute;
+                left: 400px;
+                top: 15px;
+                bottom: 20px;
+                height: 40;
+
+            }
+            #cellSide {
+                width: 60px;
+                height: 20;
+
+            }
+            #thresholdForm {
+                position: absolute;
+                left: 550px;
+                top: 15px;
+                bottom: 20px;
+                height: 40;
+            }
+            #threshold {
+                width: 60px;
+                height: 20;
+            }
+            #button1 {
+                position: absolute;
+                background-color: lightgrey;
+                border: none;
+                top: 15px;
+                left: 50px;
+                bottom: 20px;
+                border-radius: 8px;
+                height: 40;
+                width: 150;
+                text-align: center;
+            }
+            #button2 {
+                position: absolute;
+                background-color: lightgrey;
+                border: none;
+                top: 15px;
+                bottom: 20px;
+
+                left: 230px;
+                border-radius: 8px;
+                height: 40;
+                width: 150;
+                text-align: center;
+            }
+
+            #container1 {
+
+                height: 90%;
+                width: 100%;
+            }
+            #resultTable,
+            th,
+            td {
+                border: 1px solid;
+                text-align: center;
+            }
+            .row-red {
+                background-color: lightcoral;
+                text-decoration-color: black;
+            }
+            .row-green {
+                background-color: lightgreen;
+                text-decoration-color: black;
+            }
+            #pagination {
+                padding-bottom: 100px;
+            }
+            .modal {
+                display: none;
+                position: fixed;
+                z-index: 1;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                overflow: auto;
+                background-color: rgba(0, 0, 0, 0.4);
+                text-align: center;
+            }
+            .modal-content {
+                background-color: #fefefe;
+                margin: 15% auto;
+                padding: 10px;
+                border: 1px solid #888;
+                width: 80%;
+                max-width: 500px;
+                border-radius: 8px;
+            }
+            .close {
+                color: #aaa;
+                float: right;
+                font-size: 28px;
+                font-weight: bold;
+                cursor: pointer;
+            }
+            .close:hover,
+            .close:focus {
+                color: black;
+                text-decoration: none;
+                cursor: pointer;
+            }
+        </style>
+        <script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
+        <link rel="stylesheet" href="https://js.arcgis.com/4.27/esri/themes/light/main.css">
+        <script src="https://js.arcgis.com/4.27/"></script>
+        <script>
+            require([
+                "esri/Map",
+                "esri/views/SceneView",
+                "esri/Graphic",
+                "esri/layers/GraphicsLayer",
+                "esri/geometry/Polygon",
+                "esri/geometry/geometryEngine",
+                "esri/symbols/SimpleFillSymbol",
+                "esri/views/3d/analysis/LineOfSightAnalysisView3D",
+                "esri/Color",
+                "esri/analysis/LineOfSightAnalysis",
+                "esri/analysis/LineOfSightAnalysisObserver",
+                "esri/analysis/LineOfSightAnalysisTarget",
+                "esri/views/3d/analysis/LineOfSightAnalysisResult",
+                "esri/core/reactiveUtils",
+                "esri/analysis/DirectLineMeasurementAnalysis",
+                "esri/geometry/Point",
+                "esri/geometry/support/geodesicUtils",
+                "esri/widgets/FeatureTable",
+                "esri/renderers/SimpleRenderer",
+                "esri/popup/content/CustomContent",
+                "esri/layers/FeatureLayer",
+                "esri/PopupTemplate",
+                "esri/widgets/Popup"
+            ], function (Map, SceneView, Graphic, GraphicsLayer, Polygon, geometryEngine, SimpleFillSymbol, LineOfSightAnalysisView3D, Color, LineOfSightAnalysis, LineOfSightAnalysisObserver, LineOfSightAnalysisTarget, LineOfSightAnalysisResult, reactiveUtils, DirectLineMeasurementAnalysis, Point, geodesicUtils, FeatureTable, SimpleRenderer, CustomContent, FeatureLayer, PopupTemplate, Popup) {
+                console.log("test");
+                // Create Map
+                var map = new Map({basemap: "satellite", ground: "world-elevation"});
+                // Create the SceneView
+                var view = new SceneView({
+                    container: "viewDiv",
+                    map: map,
+                    camera: {
+                        position: {
+                            longitude: 32.814686448595225,
+                            latitude: 39.784306912232694,
+                            z: 9000
+                        },
+                        tilt: 0,
+                        heading: 0
+                    },
+                    popup: {
+                        dockEnabled: true,
+                        dockOptions: {
+                            position: "top-right",
+                            breakpoint: false
+                        }
+                    }
+                });
+
+                view.popupEnabled = false;
+                var graphicsLayer = new GraphicsLayer();
+                map.add(graphicsLayer);
+                var simpleMarkerSymbol = {
+                    type: "simple-marker",
+                    color: [
+                        226, 119, 40
+                    ],
+                    outline: {
+                        color: [
+                            255, 255, 255
+                        ],
+                        width: 1
+                    }
+                };
+                var pointGraphicSymbol = {
+                    type: "simple-marker",
+                    color: [
+                        0, 0, 255
+                    ], // blue color
+                    size: 6,
+                    outline: {
+                        color: [
+                            255, 255, 255
+                        ],
+                        width: 1
+                    }
+                };
+                var observerpointGraphicSymbol = {
+                    type: "simple-marker",
+                    color: [
+                        0, 0, 0
+                    ], // blue color
+                    size: 6,
+                    outline: {
+                        color: [
+                            255, 255, 255
+                        ],
+                        width: 1
+                    }
+                };
+                var trueobserverpointGraphicSymbol = {
+                    type: "simple-marker",
+                    color: [
+                        0, 255, 0
+                    ], // blue color
+                    size: 6,
+                    outline: {
+                        color: [
+                            255, 255, 255
+                        ],
+                        width: 1
+                    }
+                };
+                var falseobserverpointGraphicSymbol = {
+                    type: "simple-marker",
+                    color: [
+                        255, 0, 0
+                    ], // blue color
+                    size: 6,
+                    outline: {
+                        color: [
+                            255, 255, 255
+                        ],
+                        width: 1
+                    }
+                };
+                var coordinates = [];
+                var addButton = document.getElementById("addButton");
+                var polygonGraphic;
+                // take input coordinates
+                addButton.onclick = function (event) {
+                    var istname = document.getElementById("istname").value;
+                    var xinput = document.getElementById("xcoord").value;
+                    var yinput = document.getElementById("ycoord").value;
+                    var zinput = document.getElementById("zcoord").value;
+                    var z = new Point({z: 10, unit: "meters"});
+                    var zinput = zinput + z;
+                    coordinates.push({x: xinput, y: yinput, z: zinput});
+                    var formCoord = {
+                        istname: istname,
+                        xinput: xinput,
+                        yinput: yinput,
+                        zinput: zinput
+                    };
+                    var ad = formCoord.istname;
+                    const textSymbol = {
+                        type: "text",
+                        color: "#000000",
+                        text: ad,
+                        font: {
+                            size: 15,
+                            family: "CalciteWebCoreIcons"
+                        }
+                    };
+                    var pointinput = {
+                        type: "point",
+                        longitude: formCoord.xinput,
+                        latitude: formCoord.yinput,
+                        z: formCoord.zinput
+                    };
+                    var textpoint = {
+                        type: "point",
+                        longitude: formCoord.xinput,
+                        latitude: formCoord.yinput
+                    };
+
+                    var pointinputGraphic = new Graphic({geometry: pointinput, symbol: simpleMarkerSymbol});
+                    var textGraphic = new Graphic({geometry: textpoint, symbol: textSymbol});
+                    graphicsLayer.add(pointinputGraphic);
+                    graphicsLayer.add(textGraphic);
+                    // add points with name prev.
+                    if (coordinates.length >= 3) {
+                        var rings = coordinates.map(function (coord) {
+                            return [coord.x, coord.y, coord.z];
+                        });
+                        var fillSymbol = { // polygon symbol
+                            type: "simple-fill",
+                            color: [
+                                227, 139, 79, 0.5
+                            ],
+                            outline: {
+                                color: [
+                                    255, 255, 255
+                                ],
+                                width: 1
+                            }
+                        };
+
+                        var polygon = new Polygon({
+                            rings: rings,
+                            spatialReference: {
+                                wkid: 4326
+                            }
+                        });
+                        if (polygonGraphic != null) { // delete prev polygons as points are generated
+                            graphicsLayer.remove(polygonGraphic);
+                        }
+                        polygonGraphic = new Graphic({geometry: polygon, symbol: fillSymbol});
+                        graphicsLayer.add(polygonGraphic);
+                    }
+                    var modal = document.getElementById("myModal");
+                    if (formCoord) {
+                        modal.style.display = "none";
+                    }
+                    document.getElementById("inputForm").reset();
+                };
+
+                var button1 = document.getElementById("button1");
+                button1.onclick = function () {
+                    var onClickEvent = view.on("click", function (event) { // when click the point popup
+                        var point = {
+                            type: "point",
+                            longitude: event.mapPoint.longitude,
+                            latitude: event.mapPoint.latitude,
+                            z: event.mapPoint.z
+                        };
+                        var form = document.getElementById("inputForm"); // take from popup
+                        form.elements["xcoord"].value = point.longitude.toFixed(6);
+                        form.elements["ycoord"].value = point.latitude.toFixed(6);
+                        form.elements["zcoord"].value = point.z.toFixed(6);
+                        var modal = document.getElementById("myModal");
+                        modal.style.display = "grid";
+                        var closeModal = document.getElementsByClassName("close")[0];
+                        closeModal.onclick = function () {
+                            modal.style.display = "none";
+                        };
+                        onClickEvent.remove();
+                    });
+                    window.onclick = function (event) {
+                        var modal = document.getElementById("myModal");
+                        if (event.target == modal) {
+                            modal.style.display = "none";
+                        }
+                    };
+                }
+                var buttonAnaliz = document.getElementById("button2");
+                buttonAnaliz.onclick = function () {
+                        var cellSideInput = document.getElementById("cellSide");
+                        var thresholdInput = document.getElementById("threshold");
+                        var thresholdDistance = parseInt(thresholdInput.value);
+                        var cellSideValue = parseInt(cellSideInput.value);
+                        var rings = coordinates.map(function (coord) {
+
+                            return [coord.x, coord.y, coord.z];
+                        });
+                        var polygon = new Polygon({
+                            rings: rings,
+                            spatialReference: {
+                                wkid: 4326
+                            }
+                        });
+                        var extent = [polygon.extent.xmin, polygon.extent.ymin, polygon.extent.xmax, polygon.extent.ymax];
+                        var cellSide = cellSideValue;
+                        var options = {
+                            units: 'meters'
+                        };
+                        var grid = turf.pointGrid(extent, cellSide, options);
+                        var observerPoints = [];
+                        var points = grid.features.map((s) => {
+                            var xpt = {
+                                type: "point",
+                                longitude: s.geometry.coordinates[0],
+                                latitude: s.geometry.coordinates[1],
+                                z: s.geometry.coordinates[2],
+                                spatialReference: {
+                                    wkid: 4326
+                                }
+                            };
+                            observerPoints.push(xpt);
+                            var pointGraphic = new Graphic({geometry: xpt, symbol: pointGraphicSymbol});
+                            graphicsLayer.add(pointGraphic);
+                        });
+
+                        var analysesLOS = [];
+                        const itemsPerPage = 15; // Number of items to display per page
+                        let currentPage = 1;
+                        const timer = ms => new Promise(res => setTimeout(res, ms))
+                        var observerResults = [];
+                        async function test() {
+                            for (let index = 0; index < observerPoints.length; index++) {
+                                const element = observerPoints[index];
+                                var targetCollect = [];
+                                for (let l = 0; l < rings.length; l++) {
+                                    var lineOfSightAnalysisTarget = new LineOfSightAnalysisTarget({
+                                        position: rings[l],
+                                        elevationInfo: {
+                                            mode: "absolute-height",
+                                            offset: 30,
+                                            unit: "meters"
+                                        }
+                                    });
+                                    targetCollect.push(lineOfSightAnalysisTarget);
+                                }
+                                const lineOfSightAnalysis = new LineOfSightAnalysis({
+                                    observer: new LineOfSightAnalysisObserver(
+                                        {
+                                            position: element,
+                                            elevationInfo: {
+                                                mode: "absolute-height",
+                                                featureExpressionInfo: {
+                                                    expression: "0"
+                                                },
+                                                offset: 10,
+                                                unit: "meters"
+                                            }
+                                        }
+                                    ),
+                                    targets: targetCollect
+                                });
+                                view.analyses.add(lineOfSightAnalysis);
+                                await reactiveUtils.whenOnce(() => ! view.updating);
+
+                                var analysisView = await view.whenAnalysisView(lineOfSightAnalysis);
+                                analysesLOS.push(analysisView.results);
+                                await timer(5);
+                                view.analyses.remove(lineOfSightAnalysis);
+                            }
+                            console.table(analysesLOS);
+
+                            var intersectAndMeasurementArray = [];
+                            var getIntersect = [];
+                            var intersectObserver = [];
+                            var lineMeasurment = [];
+                            var resultsAll=[];
+                            for (let i = 0; i < observerPoints.length; i++) { // for each point(observer)
+                                let hasIntersect = false;
+                                for (let j = 0; j < rings.length; j++) { // for each target get intersected pts
+                                    var intersect = analysesLOS[i].items[j].intersectedLocation;
+                                    if (intersect !== null) {
+                                        hasIntersect = true;
+                                        var intersectpt = {
+                                            observerIndex: i,
+                                            targetIndex: j,
+                                            point: {
+                                                //type: "point",
+                                                longitude: intersect.longitude,
+                                                latitude: intersect.latitude,
+                                                z: intersect.z,
+                                                //spatialReference: {
+                                                  //  wkid: 4326
+                                                //}
+                                            }
+                                        };
+                                        var falseobserverpointGraphic = new Graphic({
+                                            geometry: observerPoints[intersectpt.observerIndex],
+                                            symbol: falseobserverpointGraphicSymbol
+                                        });
+                                        graphicsLayer.add(falseobserverpointGraphic);
+                                        var observerPoint = new Point({
+                                            x: observerPoints[i].longitude,
+                                            y: observerPoints[i].latitude,
+                                            z: observerPoints[i].z,
+                                            spatialReference: {
+                                                wkid: 4326
+                                            }
+                                        });
+
+                                        var join = geodesicUtils.geodesicDistance(new Point({x: observerPoint.x, y: observerPoint.y, z: observerPoint.z}), new Point({x: intersectpt.point.longitude, y: intersectpt.point.latitude, z: intersectpt.point.z}), "meters");
+                                        getIntersect.push(intersectpt);
+                                        lineMeasurment.push(join);
+                                        intersectAndMeasurementArray.push([intersectpt, join]);
+                                        resultsAll.push([intersectpt, join]);
+                                    } else{
+                                        var notIntersectpt= [{
+                                            observerIndex: i,
+                                            targetIndex: j,
+                                                                    
+                                        },
+                                       
+                                           
+                                        ]
+                                       
+
+                                        resultsAll.push(notIntersectpt);
+                                    }
+
+                                }
+                                if (! hasIntersect) {
+                                    var trueobserverIndex = i;
+                                    var trueobserverpointGraphic = new Graphic({geometry: observerPoints[trueobserverIndex], symbol: trueobserverpointGraphicSymbol});
+                                    graphicsLayer.add(trueobserverpointGraphic);
+                                }
+                            }
+                            console.log(resultsAll);
+                            view.on("click", function (event) {
+                                var screenPoint = new Point({
+                                    type: "point",
+                                    longitude: event.mapPoint.longitude,
+                                    latitude: event.mapPoint.latitude,
+                                    z: event.mapPoint.z,
+                                    spatialReference: {
+                                        wkid: 4326
+                                    }
+                                })
+                                var clickedObserverPoint;
+                                var clickedObserverPointIndex = -1;
+                                for (let index = 0; index < observerPoints.length; index++) {
+                                    var targetCollectLOS = [];
+                                    const element = new Point({
+                                        ... observerPoints[index]
+                                    });
+                                    var buffer = geometryEngine.geodesicBuffer(element, 15, "meters");
+                                    var intersectCheck = geometryEngine.intersects(screenPoint, buffer);
+                                    if (intersectCheck) {
+                                        clickedObserverPoint = element;
+                                        clickedObserverPointIndex = index; 
+                                      
+                                        break;
+                                    }
+                                }
+                                if (clickedObserverPoint) { // Get the index of the clicked observer point
+                                    view.analyses.removeAll();
+                                     var resultArray=[];
+                                      for (let k = 0; k < resultsAll.length; k++) {
+                                            const element = resultsAll[k];
+                                            const checkPoint=element[0].observerIndex;
+                                            if (checkPoint==clickedObserverPointIndex) {
+                                                for (let l = 0; l < rings.length; l++) {
+                                                    if (element[0].targetIndex==l) {
+                                                        var bods=[];
+                                                        resultsAll[k].forEach(sonuc => {
+                                                             
+                                                            if (sonuc.point) {
+                                                                var resultForArray={
+                                                                    resultObserverIndex: JSON.stringify(sonuc.observerIndex),
+                                                                    resultTargetIndex:JSON.stringify(sonuc.targetIndex),
+                                                                    resultIntersectLongitude:sonuc.point.longitude,
+                                                                    resultIntersectLatitude:sonuc.point.latitude,
+                                                                    resultDistance:JSON.stringify(sonuc.distance)
+                                                                };
+                                                           
+                                                            }else{
+                                                                var resultForArray={
+                                                                    resultObserverIndex: JSON.stringify(sonuc.observerIndex),
+                                                                    resultTargetIndex:JSON.stringify(sonuc.targetIndex),
+                                                                    resultDistance:JSON.stringify(sonuc.distance)
+                                                                };
+                                                            }
+                                                            
+                                                            bods.push(JSON.stringify(resultForArray));
+                                                        });
+                                                    resultArray.push(bods);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        view.openPopup({title: "Analiz", location: screenPoint});
+
+                                        var resultArray = resultArray.join(", ")
+                                        view.popup.content = "Tıklanan Nokta : " + resultArray;
+                                    for (let r = 0; r < rings.length; r++) {
+                                        var lineOfSightAnalysisTargetLOS = new LineOfSightAnalysisTarget({
+                                            position: rings[r],
+                                            elevationInfo: {
+                                                mode: "absolute-height",
+                                                offset: 30,
+                                                unit: "meters"
+                                            }
+                                        });
+                                        targetCollectLOS.push(lineOfSightAnalysisTargetLOS);
+                                    }
+                                    // Create a new LOS analysis for the clicked observer point
+                                    const lineOfSightAnalysisLOS = new LineOfSightAnalysis({
+                                        observer: new LineOfSightAnalysisObserver(
+                                            {
+                                                position: clickedObserverPoint,
+                                                elevationInfo: {
+                                                    mode: "absolute-height",
+                                                    featureExpressionInfo: {
+                                                        expression: "0"
+                                                    },
+                                                    offset: 10,
+                                                    unit: "meters"
+                                                }
+                                            }
+                                        ),
+                                        targets: targetCollectLOS
+                                    });
+                                    const analysisResult = view.analyses.add(lineOfSightAnalysisLOS);
+                                    var analysisView = view.whenAnalysisView(lineOfSightAnalysisLOS);
+                                    // view.analyses.add(lineOfSightAnalysisLOS);
+                                }
+                            });
+
+                            
+                            const totalItems = intersectAndMeasurementArray.length;
+
+                            const totalPages = Math.ceil(totalItems / itemsPerPage);
+                            function updateTable() { // console.log(intersectAndMeasurementArray);
+                                var tableBody = document.querySelector("#resultTable tbody");
+                                tableBody.innerHTML = "";
+                                const startIdx = (currentPage - 1) * itemsPerPage;
+                                const endIdx = Math.min(startIdx + itemsPerPage, totalItems);
+                                for (let ind = startIdx; ind < endIdx; ind++) {
+
+                                    var row = document.createElement("tr");
+                                    var data = intersectAndMeasurementArray[ind][0];
+
+                                    var indexCell = document.createElement("td");
+                                    indexCell.textContent = ind + 1;
+                                    row.appendChild(indexCell);
+
+                                    var observerIndexCell = document.createElement("td");
+                                    observerIndexCell.textContent = data.observerIndex;
+                                    row.appendChild(observerIndexCell);
+
+
+                                    var targetIndexCell = document.createElement("td");
+                                    targetIndexCell.textContent = data.targetIndex;
+                                    row.appendChild(targetIndexCell);
+
+
+                                    var intersectLonCell = document.createElement("td");
+                                    intersectLonCell.textContent = data.point.longitude.toFixed(6);
+                                    row.appendChild(intersectLonCell);
+
+
+                                    var intersectLatCell = document.createElement("td");
+                                    intersectLatCell.textContent = data.point.latitude.toFixed(6);
+                                    row.appendChild(intersectLatCell);
+
+
+                                    var distanceCell = document.createElement("td");
+                                    distanceCell.textContent = intersectAndMeasurementArray[ind][1].distance.toFixed(6);
+                                    row.appendChild(distanceCell);
+
+
+                                    if (intersectAndMeasurementArray[ind][1].distance<=thresholdDistance) {
+                                           row.classList.add("row-green");
+                                         }
+                                         else{
+                                           row.classList.add("row-red");
+                                         }
+                                   tableBody.appendChild(row);
+                               }
+                               document.querySelector("#currentPage").textContent = currentPage;
+                           }
+                           updateTable();
+                           const prevPageBtn = document.querySelector("#prevPageBtn");
+                           prevPageBtn.addEventListener("click", () => {
+                                        if (currentPage > 1) {
+                                            currentPage--;
+                                            updateTable();
+                                        }
+                                    }) 
+                                        const nextPageBtn = document.querySelector("#nextPageBtn");
+                                    
+
+
+                                    nextPageBtn.addEventListener("click", () => {
+                                        if (currentPage < totalPages) {
+                                            currentPage++;
+                                            updateTable();
+                                        }
+                                    });
+                                    
+                                }test();
+                            }
+                        }
+                    );
+                    </script>
+                </head>
+                <body>
+                    <div id="viewDiv"></div>
+                    <div class="form-container">
+                        <button id="button1">İstasyon Ekle</button>
+                        <button id="button2">Analiz</button>
+                        <form id="cellSideForm" style="margin-top: 10px;">
+                            <label for="cellSide">Cell Side:</label>
+                            <input type="text" id="cellSide" value="50">
+                        </form>
+                        <form id="thresholdForm" style="margin-top: 10px;">
+                            <label for="threshold">Threshold:</label>
+                            <input type="text" id="threshold" value="50">
+                        </form>
+
+                    </div>
+                    <div id="coordinates"></div>
+                    <div class="container1">
+                        <div id="tableDiv">
+                            <table id="resultTable">
+                                <thead>
+                                    <tr>
+                                        <th>Index</th>
+                                        <th>Observer Index</th>
+                                        <th>Target Index</th>
+                                        <th>Intersect Longitude</th>
+                                        <th>Intersect Latitude</th>
+                                        <th>Distance (meters)</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                            <div id="pagination">
+                                <button id="prevPageBtn">Previous Page</button>
+                                <span id="currentPage"></span>
+                                <button id="nextPageBtn">Next Page</button>
+                            </div>
+                        </div>
+                    </div>
+                    <script>
+                        var coordinatesDiv = document.getElementById("coordinates");
+                        setInterval(function () {
+                            coordinatesDiv.innerText = JSON.stringify(coordinates, null, 2);
+                            // innerText returns the text content of an element
+                            // JSON.stringify(value, replacer, space)
+                        }, 1000);
+                        // setInterval(func/code, delay) fn will be executed every delay ms.
+                    </script>
+                    <div class="container">
+                        <div id="myModal" class="modal" role="dialog">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                                        <h4 style="color:salmon;">İstasyon Ekleme
+                                        </h4>
+                                    </div>
+                                    <div class="modal-body">
+                                        <form role="form" id="inputForm">
+                                            <div class="form-group">
+                                                <label for="istname">İstasyon Adı:</label>
+                                                <input type="text" class="form-control" id="istname" placeholder="İstasyon Adı Gir">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="xcoord">
+                                                    X:</label>
+                                                <input type="text" size="30" class="form-control" id="xcoord">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="ycoord">
+                                                    Y:</label>
+                                                <input type="text" size="30" class="form-control" id="ycoord">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="zcoord">
+                                                    Z:</label>
+                                                <input type="text" size="30" class="form-control" id="zcoord">
+                                            </div>
+                                            <div>
+                                                <button id="addButton" type="button" class="btn btn-default">
+                                                    Ekle</button>
+                                            </div>
+                                        </form>
+                                        <div id="output"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </body>
+            </html>
+        </html>
+    </head>
+</html></head></html></head></html></head></html></head></html></head> </html></head></html></head></html></head></html></head></html></head></html></head></html></head></html></head></html></head></html></head></html></head></html></head></html></head></html></head></html></head></html></head></html></head></html></head></html></head></html></head></html></head></head></head></html></head></html></head></html></head></html></head></html>
